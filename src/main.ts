@@ -68,7 +68,7 @@ scene.background = new THREE.Color(0x0d1b2e);
 const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
 camera.position.set(0, 0, 6);
 
-const params = new URLSearchParams(window.location.search);
+const params = new URLSearchParams(window.location.search || '?card&sound');
 const rigParam = params.get('rig'); // null = off, '' = grid, 'big' = large three only
 // Phase 6 test view: `?head` = the 3D head through the reference camera (her drawing's framing); `?head=3q|side|back` turns it;
 // `&yaw=<deg>` and `&pitch=<deg>` override; `&bg=white|light` for a paper background. Without `?head` nothing here runs.
