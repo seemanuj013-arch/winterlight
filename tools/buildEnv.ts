@@ -1,18 +1,17 @@
 // Build-time helpers used by vite.config.ts (node only). Kept here so tests can reach them.
-/** First-load download budget from docs/PERF_BUDGET.md: 2.5 MB transferred (gzip). */
-export const DOWNLOAD_BUDGET_BYTES = 2.5 * 1024 * 1024;
+import { createHash } from 'node:crypto';
 
-/** Pure check: the files that make up a first load, with their gzip sizes. Returns an error message, or null when inside the budget. */
-export function downloadBudgetError(files: { name: string; gzipBytes: number }[], budget: number = DOWNLOAD_BUDGET_BYTES): string | null {
-  const total = files.reduce((n, f) => n + f.gzipBytes, 0);
-  if (total <= budget) return null;
-  const top = [...files].sort((a, b) => b.gzipBytes - a.gzipBytes).slice(0, 3).map((f) => `${f.name} ${(f.gzipBytes / 1024).toFixed(0)} KB`).join(', ');
-  return `First-load download is ${(total / 1048576).toFixed(2)} MB gzip, over the ${(budget / 1048576).toFixed(1)} MB budget (docs/PERF_BUDGET.md). Biggest: ${top}`;
-}
+export const MIN_PREVIEW_KEY_LENGTH = 16;
 
 type Env = Record<string, string | undefined>;
 
 /** Strict (placeholders refuse to ship) on Vercel's production environment, or when WINTERLIGHT_STRICT=1. Preview builds of `dev` stay lenient. */
 export function isStrictEnv(env: Env): boolean {
   return env.VERCEL_ENV === 'production' || env.WINTERLIGHT_STRICT === '1';
+}
+
+/** SHA-256 hex of the key, so the key itself never lands in the shipped JS. '' for no key or a key too short to be safe. */
+export function previewHashFor(key: string | undefined): string {
+  if (!key || key.length < MIN_PREVIEW_KEY_LENGTH) return '';
+  return createHash('sha256').update(key, 'utf8').digest('hex');
 }

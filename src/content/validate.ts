@@ -20,7 +20,7 @@ export interface Names {
 
 export type Wishes = Record<string, string>;
 
-export const CREDIT_KEYS = ['finale_sky_message', 'sign_off', 'made_by'] as const;
+export const CREDIT_KEYS = ['lock_title', 'lock_subtitle', 'finale_sky_message', 'sign_off', 'made_by'] as const;
 export type Credits = Record<(typeof CREDIT_KEYS)[number], string>;
 
 export interface Content {

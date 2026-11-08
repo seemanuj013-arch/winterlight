@@ -2,12 +2,12 @@ import './ui/theme.css';
 import * as THREE from 'three';
 import { createStage } from './core/renderer';
 import { createLoop, FIXED_DT } from './core/loop';
-import { PowerGovernor } from './core/power';
-import { showInAppNote } from './ui/fallback';
+import { lockState } from './core/lock';
 import silhouetteJson from '../character/traced/chamgadad_ref_01_head_front.silhouette.json';
 import type { Silhouette } from './core/silhouette';
 import { setToonViewport } from './render/toon/outline';
 import { buildToonRig } from './render/toon/rig';
+import { effectiveLock, isPreviewRequested } from './content/preview';
 import { createChamgadadHead, createHeadKeyLight, type ChamgadadHead } from './character/chamgadad/head';
 import { createReferenceCamera, fitReferenceCamera } from './character/refCamera';
 import { createFace, type Face } from './character/chamgadad/face';
@@ -507,7 +507,14 @@ stage.onResize(({ aspect, width, height, pixelRatio }) => {
 });
 
 const boot = document.getElementById('boot');
-if (boot) boot.textContent = rig || head || whole || backdrop || nook || studio || tour || inputView || starsView || skyView || cakeView || releaseView || envelopeView || finaleView || stayView || cardView || letterParam ? '' : 'Phase 0 starter: unlocked';
+if (boot) boot.textContent = rig || head || whole || backdrop || nook || studio || tour || inputView || starsView || skyView || cakeView || releaseView || envelopeView || finaleView || stayView || cardView || letterParam ? '' : lockState(Date.now()).locked ? 'Phase 0 starter: lock is ON until Nov 10, 2026 (IST)' : 'Phase 0 starter: unlocked';
+// Preview mode (Phase 4): `?preview=<key>` bypasses the lock. Without a matching key nothing changes.
+if (boot && !rig && !head && !whole && !backdrop && !nook && !studio && !tour && !inputView && !starsView && !skyView && !cakeView && !releaseView && !envelopeView && !finaleView && !stayView && !cardView && !letterParam) {
+  void isPreviewRequested(window.location.search, typeof __PREVIEW_KEY_HASH__ === 'string' ? __PREVIEW_KEY_HASH__ : '').then((preview) => {
+    if (preview && !effectiveLock(Date.now(), true).locked) boot.textContent = 'Phase 0 starter: unlocked (preview)';
+  });
+}
+
 // Same slow turn as Phase 0 (sin(t/1500 ms) * 0.5), now driven by the fixed-step clock.
 let simSec = 0;
 const driveMode = params.get('drive');
@@ -559,10 +566,6 @@ if (params.has('at') && actor) {
     holder.position.sub(box.getCenter(new THREE.Vector3()));
   }
 }
-// Phase 31: low power. Draw at most 30 times a second once the card is at its lowest tier and still slow (or with `?lowpower`).
-const power = new PowerGovernor();
-if (params.has('lowpower')) power.enter();
-let skippedSec = 0;
 const loop = createLoop({
   step(dt) {
     if (inputView) inputView.update(dt);
@@ -596,12 +599,7 @@ const loop = createLoop({
     finaleView?.render(t);
     stayView?.render(t);
     cardView?.render(t);
-    power.push(frameSec * 1000, stage.tier === 'low');
-    skippedSec += frameSec;
-    if (power.shouldDraw(performance.now())) {
-      stage.render(scene, refCam ?? camera, skippedSec);
-      skippedSec = 0;
-    }
+    stage.render(scene, refCam ?? camera, frameSec);
     if (!splash.done) void splash.finish(); // the first picture is up: the loading screen fades away
   },
 });
@@ -653,14 +651,3 @@ if (tour) {
     loop.start();
   });
 } else loop.start();
-
-// Phase 31: offline shell. Production only; `?nosw` turns it off for a test run. A failure to register changes nothing.
-if (import.meta.env.PROD && 'serviceWorker' in navigator && !params.has('nosw')) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
-  });
-}
-
-// Phase 33: no double-tap or pinch zoom on iOS Safari (it ignores the viewport lock), and a gentle note inside chat-app browsers.
-for (const ev of ['gesturestart', 'gesturechange']) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
-if (!params.has('noinapp')) showInAppNote();

@@ -53,6 +53,14 @@ export interface AudioOptions {
   storage?: Pick<Storage, 'getItem' | 'setItem'> | null;
 }
 
+// Background music: the owner's own instrumental (src/audio/music/perfect.mp3), bundled with the page, looping under everything. It goes through the same duck and master as the beds,
+// so the mute button, the volume and the wish / letter / hush ducks all apply. It is held away while the music-box birthday tune plays and comes back after.
+const MUSIC_URL = new URL('./music/perfect.mp3', import.meta.url).href;
+const MUSIC_LEVEL = 0.75;
+const MUSIC_FADE_IN_S = 4;
+const MUSIC_HOLD_FADE_S = 2.5;
+const MUSIC_BACK_AFTER_S = 1.5;
+
 type Win = { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext };
 
 function defaultContext(): AudioContext | null {
@@ -83,6 +91,10 @@ export function createAudioEngine(o: AudioOptions = {}): AudioEngine {
   let beds: Beds | null = null;
   let purrLoop: Loop | null = null;
   let white: AudioBuffer | null = null;
+  let musicGain: GainNode | null = null;
+  let musicEl: HTMLAudioElement | null = null;
+  let musicHold = false;
+  let musicBackTimer: number | undefined;
   let breatheTimer: number | undefined;
   let melodyTimer: number | undefined;
   const queue = new LookaheadQueue<NoteEvent>();
@@ -142,7 +154,44 @@ export function createAudioEngine(o: AudioOptions = {}): AudioEngine {
     purrLoop = g.purr;
     white = g.white;
     c.addEventListener?.('statechange', onCtxState);
+    buildMusic();
     return true;
+  }
+
+  function buildMusic(): void {
+    if (!ctx || !duckGain || musicEl || typeof Audio === 'undefined') return;
+    try {
+      const el = new Audio(MUSIC_URL);
+      el.loop = true;
+      el.preload = 'auto';
+      const src = ctx.createMediaElementSource(el);
+      const g = ctx.createGain();
+      g.gain.value = 0;
+      src.connect(g);
+      g.connect(duckGain);
+      musicEl = el;
+      musicGain = g;
+    } catch {
+      musicEl = null; // no music is better than no sound at all
+      musicGain = null;
+    }
+  }
+
+  function startMusic(): void {
+    if (!ctx || !musicEl || !musicGain) return;
+    try {
+      const p = musicEl.play();
+      if (p && typeof p.catch === 'function') p.catch(() => undefined);
+    } catch {
+      /* the next gesture tries again */
+    }
+    musicGain.gain.setTargetAtTime(musicHold ? 0 : MUSIC_LEVEL, ctx.currentTime, MUSIC_FADE_IN_S / 3);
+  }
+
+  function holdMusic(on: boolean): void {
+    musicHold = on;
+    if (!ctx || !musicGain) return;
+    musicGain.gain.setTargetAtTime(on ? 0 : MUSIC_LEVEL, ctx.currentTime, MUSIC_HOLD_FADE_S / 3);
   }
 
   const onCtxState = (): void => {
@@ -165,6 +214,7 @@ export function createAudioEngine(o: AudioOptions = {}): AudioEngine {
       }, 700);
     }
     if (purring) purrLoop?.start(t);
+    startMusic();
   }
 
   function resume(): void {
@@ -204,6 +254,11 @@ export function createAudioEngine(o: AudioOptions = {}): AudioEngine {
   const onVisibility = (): void => {
     if (document.visibilityState === 'hidden') {
       feed('hidden');
+      try {
+        musicEl?.pause();
+      } catch {
+        /* ignore */
+      }
       // a hidden tab should not keep playing a tune to nobody
       try {
         void ctx?.suspend();
@@ -317,6 +372,10 @@ export function createAudioEngine(o: AudioOptions = {}): AudioEngine {
       queue.clear();
       queue.push(events);
       const last = events[events.length - 1]!;
+      // the music steps aside for the music box, then comes back
+      holdMusic(true);
+      if (musicBackTimer !== undefined) window.clearTimeout(musicBackTimer);
+      musicBackTimer = window.setTimeout(() => holdMusic(false), (last.at + last.dur - now() + MUSIC_BACK_AFTER_S) * 1000);
       const pump = (): void => {
         if (!ctx || !sfx) return;
         for (const { event, late } of queue.pump(ctx.currentTime)) {
@@ -371,8 +430,16 @@ export function createAudioEngine(o: AudioOptions = {}): AudioEngine {
         document.removeEventListener('visibilitychange', onVisibility);
         if (breatheTimer !== undefined) window.clearInterval(breatheTimer);
         if (melodyTimer !== undefined) window.clearInterval(melodyTimer);
+        if (musicBackTimer !== undefined) window.clearTimeout(musicBackTimer);
       }
-      breatheTimer = melodyTimer = undefined;
+      breatheTimer = melodyTimer = musicBackTimer = undefined;
+      try {
+        musicEl?.pause();
+      } catch {
+        /* ignore */
+      }
+      musicEl = null;
+      musicGain = null;
       listeners.clear();
       try {
         void ctx?.close();

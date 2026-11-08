@@ -193,6 +193,88 @@ export function createStayView(ctx: { stage: Stage; scene: THREE.Scene; camera: 
   const onPetKeyUp = (e: KeyboardEvent): void => {
     if (e.key === 'b' || e.key === 'B') pet.keyUp();
   };
+  // Free roam: W A S D walk (forward, left, back, right) and the arrows / a drag turn; on a phone the little stick at the bottom left walks. Same rules as the other keys: never when a control,
+  // field or dialog has the focus, never with a modifier. Releasing a key always stops it.
+  const held = new Set<string>();
+  let stick: [number, number] = [0, 0];
+  const pushMove = (): void => {
+    const f = (held.has('w') ? 1 : 0) - (held.has('s') ? 1 : 0) + -stick[1];
+    const s = (held.has('d') ? 1 : 0) - (held.has('a') ? 1 : 0) + stick[0];
+    world.move(Math.max(-1, Math.min(1, f)), Math.max(-1, Math.min(1, s)));
+  };
+  const onWalkDown = (e: KeyboardEvent): void => {
+    const k = e.key.toLowerCase();
+    if (k !== 'w' && k !== 'a' && k !== 's' && k !== 'd') return;
+    if (e.defaultPrevented || e.ctrlKey || e.altKey || e.metaKey) return;
+    if (!stay.machine.staying || keyBelongsToSomethingElse(e.target)) return;
+    held.add(k);
+    pushMove();
+    e.preventDefault();
+  };
+  const onWalkUp = (e: KeyboardEvent): void => {
+    if (held.delete(e.key.toLowerCase())) pushMove();
+  };
+  const onWalkBlur = (): void => {
+    held.clear();
+    stick = [0, 0];
+    pushMove();
+  };
+  window.addEventListener('keydown', onWalkDown);
+  window.addEventListener('keyup', onWalkUp);
+  window.addEventListener('blur', onWalkBlur);
+  const pad = document.createElement('div');
+  pad.setAttribute('aria-hidden', 'true');
+  pad.style.cssText = 'position:fixed;left:max(18px,env(safe-area-inset-left));bottom:max(22px,env(safe-area-inset-bottom));width:112px;height:112px;border-radius:50%;background:rgba(214,236,255,.10);border:1px solid rgba(214,236,255,.28);touch-action:none;z-index:6;display:none;user-select:none;-webkit-user-select:none';
+  const knob = document.createElement('div');
+  knob.style.cssText = 'position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:rgba(236,246,255,.55);box-shadow:0 0 14px rgba(190,220,255,.35);pointer-events:none';
+  pad.appendChild(knob);
+  document.body.appendChild(pad);
+  let padId: number | null = null;
+  const padMove = (e: PointerEvent): void => {
+    const r = pad.getBoundingClientRect();
+    const R = r.width / 2;
+    let dx = e.clientX - (r.left + R);
+    let dy = e.clientY - (r.top + R);
+    const d = Math.hypot(dx, dy);
+    if (d > R) {
+      dx = (dx / d) * R;
+      dy = (dy / d) * R;
+    }
+    knob.style.transform = `translate(${dx}px,${dy}px)`;
+    const dead = 0.18;
+    const nx = dx / R;
+    const ny = dy / R;
+    stick = Math.hypot(nx, ny) < dead ? [0, 0] : [nx, ny];
+    pushMove();
+  };
+  const padEnd = (e: PointerEvent): void => {
+    if (padId === null || e.pointerId !== padId) return;
+    padId = null;
+    knob.style.transform = '';
+    stick = [0, 0];
+    pushMove();
+  };
+  pad.addEventListener('pointerdown', (e) => {
+    if (padId !== null) return;
+    padId = e.pointerId;
+    try {
+      pad.setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    e.preventDefault();
+    padMove(e);
+  });
+  pad.addEventListener('pointermove', (e) => {
+    if (e.pointerId === padId) padMove(e);
+  });
+  pad.addEventListener('pointerup', padEnd);
+  pad.addEventListener('pointercancel', padEnd);
+  const showPad = (on: boolean): void => {
+    pad.style.display = on ? 'block' : 'none';
+    if (!on) onWalkBlur();
+  };
+  const offPad = [stay.bus.on('stay:enter', () => showPad(true)), stay.bus.on('stay:exit', () => showPad(false))];
   window.addEventListener('keydown', onPetKeyDown);
   window.addEventListener('keyup', onPetKeyUp);
   canvas.addEventListener('pointerdown', onPetDown);
@@ -201,6 +283,7 @@ export function createStayView(ctx: { stage: Stage; scene: THREE.Scene; camera: 
   canvas.addEventListener('pointercancel', onPetUp);
   canvas.style.touchAction = 'none'; // a drag turns the view; it is not a scroll
   stay.enter();
+  showPad(stay.machine.staying);
   if (params.has('pan')) {
     const [yaw, pitch] = (params.get('pan') ?? '').split(',').map(Number);
     // the same door a hand uses: a drag scaled so it comes out as that many degrees (clamped by the world, as always)
@@ -333,6 +416,11 @@ export function createStayView(ctx: { stage: Stage; scene: THREE.Scene; camera: 
     },
     dispose() {
       input.dispose();
+      window.removeEventListener('keydown', onWalkDown);
+      window.removeEventListener('keyup', onWalkUp);
+      window.removeEventListener('blur', onWalkBlur);
+      offPad.forEach((f) => f());
+      pad.remove();
       window.removeEventListener('keydown', onPetKeyDown);
       window.removeEventListener('keyup', onPetKeyUp);
       canvas.removeEventListener('pointerdown', onPetDown);

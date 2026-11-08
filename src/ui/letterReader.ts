@@ -1,3 +1,4 @@
+import { LETTER_END_EMOJI, LETTER_TOP_EMOJI } from './emoji';
 // Phase 24: the letter reader. Plain DOM, no three, no draw calls. The look lives in theme.css (classes `wl-letter*`).
 //   text    EXACTLY as given: `textContent` in a `white-space: pre-wrap` block, so line breaks and spaces stay as the owner wrote them. Never trimmed, never edited.
 //   scroll  the panel scrolls, the page behind does not; the first line is at the top when it opens
@@ -47,7 +48,14 @@ export function createLetterReader(o: LetterReaderOptions): LetterReader {
   const column = document.createElement('div');
   column.className = 'wl-letter-text';
   column.textContent = o.text; // exactly as given
-  scroller.appendChild(column);
+  const deco = (e: string): HTMLDivElement => {
+    const d = document.createElement('div');
+    d.textContent = e;
+    d.setAttribute('aria-hidden', 'true');
+    d.style.cssText = 'max-width:32em;margin:0 auto;text-align:center;font-size:1.7rem;line-height:1.2;padding:0.4rem 0 0.9rem';
+    return d;
+  };
+  scroller.append(deco(LETTER_TOP_EMOJI), column);
   if (o.signOff && o.signOff.length > 0) {
     const sign = document.createElement('div');
     sign.className = 'wl-letter-signoff';
@@ -58,6 +66,7 @@ export function createLetterReader(o: LetterReaderOptions): LetterReader {
     }
     scroller.appendChild(sign);
   }
+  scroller.appendChild(deco(LETTER_END_EMOJI));
   if (o.onScroll) scroller.addEventListener('scroll', () => o.onScroll?.(), { passive: true });
 
   const closeBtn = document.createElement('button');

@@ -1,11 +1,9 @@
 # DEPLOY_VERCEL (DV)
 
-> **Hosting moved to GitHub Pages (owner's decision). See `docs/DEPLOY_GITHUB_PAGES.md`.** `vercel.json` stays but does nothing on Pages.
-
 ## One-time setup (Phase 1)
 1. Create a **private** GitHub repo `winterlight`. Push `main` and `dev`.
 2. On vercel.com: Add New, Project, import the repo. Framework preset: **Vite**. Build command `npm run build`, output `dist`. Production branch: `main`.
-3. Project Settings, Environment Variables: (no environment variables are needed).
+3. Project Settings, Environment Variables: add `VITE_PREVIEW_KEY` (any long random string; Phase 4 uses it for the owner's preview bypass). Never commit it.
 4. First deploy happens automatically. Open the URL on your phone.
 5. `vercel.json` already sends `X-Robots-Tag: noindex, nofollow` and `Referrer-Policy: no-referrer`; `public/robots.txt` disallows everything. Confirm both on the live URL.
 
@@ -19,8 +17,9 @@ Send the **production** URL only after G3, and ideally on 10 Nov itself (the loc
 
 ## Notes
 - The repo is private; the deployed site is not. Assume anyone with the link can read the page source. `tools/leak_scan.mjs` (Phase 34) checks the build for anything private.
-- There is no lock: the owner sends the link on the day.
+- The lock is client-side plus a server-time check (`api/time.ts`, Phase 29). It is a surprise-keeper, not security.
 - Free (Hobby) Vercel is fine for this.
 
-## Placeholder guard (Phase 4)
+## Preview key and placeholder guard (Phase 4)
+- Open the card before the unlock with `https://<your-url>/?preview=<VITE_PREVIEW_KEY value>`. The key must be 16+ characters or preview stays off. Set it in Vercel; locally put it in `.env.local` (ignored by git; see `.env.example`). The build compiles in only its SHA-256, never the key.
 - Production builds (Vercel's production environment, i.e. branch `main`, or `WINTERLIGHT_STRICT=1`) refuse to build while any `TODO_OWNER` remains in `content/`, and list each one. Preview builds of `dev` allow placeholders so phase pushes keep working. Try it locally: `WINTERLIGHT_STRICT=1 npm run build`.

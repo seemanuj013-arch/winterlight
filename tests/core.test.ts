@@ -1,7 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { lockState, splitRemaining } from '../src/core/lock';
 import { pickInitialTier, settingsFor } from '../src/core/quality';
 import { validateSilhouette, boundsOf, type Silhouette } from '../src/core/silhouette';
+
+describe('lock', () => {
+  it('is locked before midnight IST on Nov 10 and open after', () => {
+    expect(lockState(Date.parse('2026-11-09T18:29:59Z')).locked).toBe(true);
+    expect(lockState(Date.parse('2026-11-09T18:30:00Z')).locked).toBe(false);
+  });
+  it('splits remaining time', () => {
+    expect(splitRemaining(90061000)).toEqual({ d: 1, h: 1, m: 1, s: 1 });
+  });
+});
 
 describe('quality', () => {
   it('drops to low for reduced motion and weak devices', () => {

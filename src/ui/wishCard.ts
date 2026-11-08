@@ -25,6 +25,8 @@ export interface WishCard {
   dispose(): void;
 }
 
+import { emojiFor } from './emoji';
+
 export function createWishCard(o: WishCardOptions): WishCard {
   const card = document.createElement('div');
   card.id = 'wish-card';
@@ -33,6 +35,10 @@ export function createWishCard(o: WishCardOptions): WishCard {
   card.setAttribute('role', 'dialog');
   card.setAttribute('aria-modal', 'false'); // the sky behind stays reachable by a tap on a finished star
   card.setAttribute('aria-hidden', 'true');
+  const mark = document.createElement('span');
+  mark.setAttribute('aria-hidden', 'true');
+  mark.style.cssText = 'display:block;text-align:center;font-size:1.5em;line-height:1.2;margin-bottom:0.25em';
+  card.appendChild(mark);
   const body = document.createElement('span');
   card.appendChild(body);
   if (o.closeCue) {
@@ -57,6 +63,7 @@ export function createWishCard(o: WishCardOptions): WishCard {
   function openNow(id: string, text: string): void {
     openId = id;
     body.textContent = text;
+    mark.textContent = emojiFor(id);
     card.style.display = 'block';
     card.setAttribute('aria-hidden', 'false');
     void card.offsetWidth; // let the fade start from 0

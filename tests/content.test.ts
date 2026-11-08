@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { assertContent, validateContent, ContentError, PLACEHOLDER, type RawContent } from '../src/content/validate';
-import { isStrictEnv } from '../tools/buildEnv';
+import { isPreviewRequested, effectiveLock, sha256Hex } from '../src/content/preview';
+import { isStrictEnv, previewHashFor } from '../tools/buildEnv';
 import { createBus } from '../src/state/events';
 import { createProgress, createMemoryStorage, parseProgress, pickStorage, PROGRESS_KEY, type KeyValueStorage } from '../src/state/progress';
 
@@ -16,15 +17,20 @@ const filled: RawContent = {
     formal: 'F', nickname: 'N', owner_calls_her: 'O', she_calls_owner: 'S', character: { name: 'C' },
     constellations: ['strawberry', 'bumblebee', 'rose', 'kaaju-katli', 'cutie-patootie'].map((id) => ({ id, name: id, shape: 's' })),
   }),
-  credits: JSON.stringify({ finale_sky_message: 'c', sign_off: 'd', made_by: 'e' }),
+  credits: JSON.stringify({ lock_title: 'a', lock_subtitle: 'b', finale_sky_message: 'c', sign_off: 'd', made_by: 'e' }),
 };
 
 describe('placeholder detection', () => {
   it('finds every placeholder in the real files, with file and field', () => {
     const r = validateContent(real);
     expect(r.errors).toEqual([]);
-    // the real files fill in over time, so only the shape is pinned: every placeholder names its file and field
-    for (const p of r.placeholders) expect(`${p.file}:${p.where}`).toMatch(/^content\/[a-z]+\.(md|json):.+/);
+    const where = r.placeholders.map((p) => `${p.file}:${p.where}`);
+    expect(where).toContain('content/letter.md:(whole file)');
+    expect(where).toContain('content/wishes.json:strawberry');
+    expect(where).toContain('content/wishes.json:cutie-patootie');
+    expect(where).toContain('content/credits.json:lock_title');
+    expect(where).toContain('content/credits.json:made_by');
+    expect(r.placeholders).toHaveLength(11);
   });
   it('allows placeholders in dev and returns the content as written', () => {
     const r = assertContent(real, false);
@@ -63,11 +69,49 @@ describe('structural errors are always fatal', () => {
     const dup = JSON.parse(filled.names);
     dup.constellations[1].id = 'strawberry';
     expect(() => assertContent({ ...filled, names: JSON.stringify(dup) }, false)).toThrow(/used twice/);
-    expect(() => assertContent({ ...filled, credits: JSON.stringify({ finale_sky_message: 'a' }) }, false)).toThrow(/sign_off/);
+    expect(() => assertContent({ ...filled, credits: JSON.stringify({ lock_title: 'a' }) }, false)).toThrow(/sign_off/);
   });
 });
 
-describe('build env', () => {
+describe('preview key', () => {
+  const key = 'a-long-random-test-key-0123456789';
+  const hash = previewHashFor(key);
+  it('the build-time hash matches the browser-side hash', async () => {
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(await sha256Hex(key)).toBe(hash);
+  });
+  it('accepts only the right key', async () => {
+    expect(await isPreviewRequested(`?preview=${key}`, hash)).toBe(true);
+    expect(await isPreviewRequested(`?x=1&preview=${key}`, hash)).toBe(true);
+    expect(await isPreviewRequested('?preview=wrong', hash)).toBe(false);
+    expect(await isPreviewRequested('?preview=', hash)).toBe(false);
+    expect(await isPreviewRequested('', hash)).toBe(false);
+    expect(await isPreviewRequested(`?preview=${key}x`, hash)).toBe(false);
+  });
+  it('is off for everybody when no key is configured, even for an empty or guessed value', async () => {
+    expect(await isPreviewRequested('?preview=anything', '')).toBe(false);
+    expect(await isPreviewRequested('?preview=', '')).toBe(false);
+  });
+  it('treats a digest failure as not-preview', async () => {
+    const boom = () => Promise.reject(new Error('no crypto'));
+    expect(await isPreviewRequested(`?preview=${key}`, hash, boom)).toBe(false);
+  });
+  it('a too-short or missing key gives no hash, so preview stays off', () => {
+    expect(previewHashFor(undefined)).toBe('');
+    expect(previewHashFor('')).toBe('');
+    expect(previewHashFor('short')).toBe('');
+  });
+  it('the key is not stored in the repo', () => {
+    const files = ['.env.example', 'vercel.json', 'package.json', 'index.html'].map((f) => readFileSync(f, 'utf8')).join('\n');
+    expect(files).not.toMatch(/VITE_PREVIEW_KEY=\S/);
+    expect(readFileSync('.gitignore', 'utf8')).toMatch(/^\.env$/m);
+  });
+  it('bypasses the lock only in preview', () => {
+    const before = Date.parse('2026-11-04T00:00:00Z');
+    expect(effectiveLock(before, false).locked).toBe(true);
+    expect(effectiveLock(before, true)).toEqual({ locked: false, msRemaining: 0 });
+    expect(effectiveLock(Date.parse('2026-11-09T18:30:00Z'), false).locked).toBe(false);
+  });
   it('strict mode follows Vercel production or WINTERLIGHT_STRICT=1 only', () => {
     expect(isStrictEnv({ VERCEL_ENV: 'production' })).toBe(true);
     expect(isStrictEnv({ WINTERLIGHT_STRICT: '1' })).toBe(true);

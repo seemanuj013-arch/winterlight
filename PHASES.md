@@ -285,7 +285,7 @@ Each phase is sized to finish inside one Claude.ai session: read docs, build, ve
 ## MILESTONE 6 — Lock, secrets, resilience (Phases 29–31)
 *Exit criteria: it stays locked until midnight IST, hides small secrets, and survives bad hostel Wi-Fi.*
 
-## Phase 29 — The lock `[MUST]` — DROPPED by the owner (no lock; the link is sent on the day)
+## Phase 29 — The lock `[MUST]`
 **Goal:** A waiting screen that is itself a small gift, then the unlock at 00:00 IST.
 **Depends on:** 4, 17.
 **In scope:** the lock scene: a snow globe or a quiet frosted window with the countdown in days, hours, minutes, seconds; it tracks real time (a re-check against a server time endpoint on Vercel so a changed phone clock does not unlock it early, with a safe fallback to the device clock if the call fails); the moment it hits zero while open, the globe cracks open into the real scene; preview key bypass for the owner only; wording from the owner (`content/`), never romantic.
@@ -293,7 +293,7 @@ Each phase is sized to finish inside one Claude.ai session: read docs, build, ve
 **Key files:** `src/acts/act0_lock.ts`, `api/time.ts`, `tests/lock.test.ts`.
 **How to verify:** lock tests with a fake clock (before, exactly at, after; clock skew; endpoint failure); a headless run with the clock faked past the unlock time. Real wall-clock behaviour on 10 Nov is an owner item.
 
-## Phase 30 — Easter eggs `[COULD]` — SKIPPED by the owner
+## Phase 30 — Easter eggs `[COULD]`
 **Goal:** Little rewards for curiosity.
 **Depends on:** 22, 16, 19.
 **In scope:** tap the moon five times and it puts on a party hat; the hidden kaaju katli sweet; a sleepy-secret creature that appears only after ten seconds of stillness; the optional kiwi-bird cameo (owner's yes needed); the optional roommate sign; each secret recorded in progress and counted in a quiet "N of M found" in stay-a-while mode.

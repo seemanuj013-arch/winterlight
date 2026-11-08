@@ -16,7 +16,7 @@ const filled: RawContent = {
     formal: 'F', nickname: 'N', owner_calls_her: 'O', she_calls_owner: 'S', character: { name: 'C' },
     constellations: ['strawberry', 'bumblebee', 'rose', 'kaaju-katli', 'cutie-patootie'].map((id) => ({ id, name: id, shape: 's' })),
   }),
-  credits: JSON.stringify({ finale_sky_message: 'c', sign_off: 'd', made_by: 'e' }),
+  credits: JSON.stringify({ lock_title: 'a', lock_subtitle: 'b', finale_sky_message: 'c', sign_off: 'd', made_by: 'e' }),
 };
 
 const run = (m: LetterMachine, seconds: number, dt = 1 / 60): void => {

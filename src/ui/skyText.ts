@@ -1,3 +1,4 @@
+import { emojiFor } from './emoji';
 // Phase 22: the words that go with the five constellations. Plain DOM, no three, no draw calls, no constellations import (the page that owns both wires them together).
 //   name   the constellation's name (from content/names.json) fades in softly under its shape, and stays, quietly, once the shape is finished (no fade under reduced motion)
 //   wish   the wish card (text EXACTLY as in content/wishes.json: never trimmed, never rewritten; a placeholder shows as it is, so the owner can see where their words go)
@@ -56,7 +57,7 @@ export function createSkyText(o: SkyTextOptions): SkyText {
     showName(id, instant = false) {
       if (labels.has(id)) return;
       const el = document.createElement('div');
-      el.textContent = o.names[id] ?? '';
+      el.textContent = o.names[id] ? `${emojiFor(id)} ${o.names[id]}` : '';
       el.setAttribute('aria-hidden', 'true'); // the wish card says the name (with the wish), once
       el.className = 'wl-label';
       el.style.left = '-999px';

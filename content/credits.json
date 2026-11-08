@@ -1,6 +1,8 @@
 {
-  "_note": "Owner's wording. Finale sky message, sign-off. Keep it friendly and not romantic.",
-  "finale_sky_message": "Happy birthday, Shruti. From the skies, the oceans and the faraway lands, wishing you every good thing.",
-  "sign_off": "your small and insignificant kiwi",
-  "made_by": "yours kiwiii"
+  "_note": "Owner's wording. Locked-screen text, finale sky message, sign-off. Keep it friendly and not romantic.",
+  "lock_title": "TODO_OWNER",
+  "lock_subtitle": "TODO_OWNER",
+  "finale_sky_message": "TODO_OWNER",
+  "sign_off": "TODO_OWNER",
+  "made_by": "TODO_OWNER"
 }
