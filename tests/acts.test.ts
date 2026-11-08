@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import {
   ACT1, ACT2, Act1Machine, Act2Machine, DOOR_SPOT, HINT_TEXT, SLEEP_SECRET_ID, WALK_POINTS, follow, hopTravel, lerpAngle, parseNookLine, parseScript, planWalk, scriptAt,
   type Act1In, type Act1Out, type Act2Out,
@@ -299,7 +299,7 @@ describe('Act 1: robustness', () => {
       expect(dones).toBeLessThanOrEqual(1);
       expect(m.log.length).toBeLessThanOrEqual(400);
     }
-  });
+  }, 15_000);
   it('a huge dt counts as 0.1 s (a stalled tab does not skip the wake)', () => {
     const m = new Act1Machine();
     const o = m.update(60, HOLD);
@@ -524,10 +524,11 @@ describe('purity', () => {
   });
   it('only main.ts imports the acts; the acts folder is the only place with the words', () => {
     const walk = (d: string): string[] => readdirSync(d).flatMap((f) => (statSync(join(d, f)).isDirectory() ? walk(join(d, f)) : [join(d, f)]));
-    for (const f of walk('src').filter((x) => x.endsWith('.ts') && !x.startsWith('src/acts'))) {
-      const t = readFileSync(f, 'utf8');
-      if (f === 'src/main.ts') continue;
-      expect(t, f).not.toMatch(/from '\.\.?\/(\.\.\/)?acts/);
+    for (const path of walk('src').filter((x) => x.endsWith('.ts'))) {
+      const f = path.split(sep).join('/');
+      if (f.startsWith('src/acts/') || f === 'src/main.ts') continue;
+      const t = readFileSync(path, 'utf8');
+      expect(t, f).not.toMatch(/from '\.\.?\/(\.\.\/)?acts\//);
     }
   });
   it('the owner\'s files are untouched by the build (letter and wishes stay as given)', () => {

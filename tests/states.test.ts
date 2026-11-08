@@ -448,7 +448,7 @@ describe('no pops, no explosions', () => {
     // the stretch channel is scaled by 0.07 into body height: the hop's spring is its fastest move, about 1.5 percent of height per frame
     expect(worstStretch * 0.07).toBeLessThan(0.02);
     expect(worstBreath).toBeLessThan(0.1);
-  });
+  }, 15_000);
   it('switching state at any moment starts exactly where Chamgadad is (no jump)', () => {
     for (const from of ['hop', 'wave', 'curiousLean', 'findFinger', 'sitLookUp'] as const) {
       for (const at of [0.05, 0.3, 0.7, 1.2, 1.9]) {

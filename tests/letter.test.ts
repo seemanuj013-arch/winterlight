@@ -295,7 +295,7 @@ describe('the flow, the reader\'s sign-off and the read-again button (second qua
   it('the sign-off is its own block set with textContent, outside the letter column', () => {
     expect(reader).toContain("sign.className = 'wl-letter-signoff'");
     expect(reader).toContain('p.textContent = line');
-    expect(reader).toMatch(/scroller\.appendChild\(column\);[\s\S]*scroller\.appendChild\(sign\)/);
+    expect(reader).toMatch(/scroller\.append\(deco\(LETTER_TOP_EMOJI\), column\);[\s\S]*scroller\.appendChild\(sign\)/);
     expect(css).toContain('.wl-letter-signoff');
   });
   it('replay controls have a letter kind, a plain label, and keep their order (Phase 28 added `finale` before `letter`)', () => {

@@ -551,7 +551,7 @@ describe('purity', () => {
     }
   });
 
-  it('there are no audio files in the project (all sound is synthesised)', () => {
+  it('the bundled background music is the only audio file in the project', () => {
     const walk = (d: string): string[] =>
       readdirSync(d).flatMap((n) => {
         if (n === 'node_modules' || n === 'dist' || n === '.git') return [];
@@ -559,7 +559,11 @@ describe('purity', () => {
         return statSync(p).isDirectory() ? walk(p) : [p];
       });
     const shipped = [...walk('src'), ...walk('public'), ...walk('content')];
-    for (const f of shipped) expect(/\.(mp3|ogg|wav|m4a|aac|flac|webm)$/i.test(f) ? f : '').toBe('');
+    const audioFiles = shipped
+      .filter((f) => /\.(mp3|ogg|wav|m4a|aac|flac|webm)$/i.test(f))
+      .map((f) => relative('.', f).split(sep).join('/'))
+      .sort();
+    expect(audioFiles).toEqual(['src/audio/music/perfect.mp3']);
   });
 });
 
@@ -699,11 +703,17 @@ interface Intervals {
   id: number;
   fn: () => void;
 }
+interface Timeout {
+  id: number;
+  fn: () => void;
+  remainingMs: number;
+}
 function installDom() {
   const win = new Map<string, Set<(e?: unknown) => void>>();
   const doc = new Map<string, Set<(e?: unknown) => void>>();
   let nextId = 1;
   const intervals: Intervals[] = [];
+  const timeouts: Timeout[] = [];
   const add = (m: Map<string, Set<(e?: unknown) => void>>) => (t: string, f: (e?: unknown) => void) => {
     if (!m.has(t)) m.set(t, new Set());
     m.get(t)!.add(f);
@@ -712,6 +722,15 @@ function installDom() {
   const fakeWindow = {
     addEventListener: add(win),
     removeEventListener: remove(win),
+    setTimeout: (fn: () => void, delay = 0) => {
+      const id = nextId++;
+      timeouts.push({ id, fn, remainingMs: delay });
+      return id;
+    },
+    clearTimeout: (id: number) => {
+      const i = timeouts.findIndex((x) => x.id === id);
+      if (i >= 0) timeouts.splice(i, 1);
+    },
     setInterval: (fn: () => void) => {
       const id = nextId++;
       intervals.push({ id, fn });
@@ -733,8 +752,18 @@ function installDom() {
     fireDoc: (t: string) => [...(doc.get(t) ?? [])].forEach((f) => f({ type: t })),
     listenerCount: () => [...win.values(), ...doc.values()].reduce((s, x) => s + x.size, 0),
     intervals,
-    /** run every timer once (the engine's are 100 ms and 700 ms; tests do not care which) */
-    tick: () => [...intervals].forEach((x) => x.fn()),
+    timeouts,
+    /** Run intervals once and advance timeouts by 100 ms, matching the test audio clock. */
+    tick: () => {
+      [...intervals].forEach((x) => x.fn());
+      for (const timeout of [...timeouts]) {
+        timeout.remainingMs -= 100;
+        if (timeout.remainingMs <= 0) {
+          timeouts.splice(timeouts.indexOf(timeout), 1);
+          timeout.fn();
+        }
+      }
+    },
     restore: () => {
       g.window = before.window;
       g.document = before.document;
