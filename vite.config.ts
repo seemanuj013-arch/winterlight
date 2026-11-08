@@ -21,11 +21,14 @@ export default defineConfig(({ mode }) => {
   // '' prefix: also sees Vercel's own variables (VERCEL_ENV). Only the two values below are ever put into the bundle.
   const env = { ...loadEnv(mode, process.cwd(), ''), ...process.env };
   const strict = isStrictEnv(env);
+  const repositoryName = env.GITHUB_REPOSITORY?.split('/')[1];
+  const base = env.GITHUB_ACTIONS === 'true' && repositoryName ? `/${repositoryName}/` : '/';
   const key = env.VITE_PREVIEW_KEY;
   if (key && key.length < MIN_PREVIEW_KEY_LENGTH) {
     console.warn(`[winterlight] VITE_PREVIEW_KEY is shorter than ${MIN_PREVIEW_KEY_LENGTH} characters, so preview mode is OFF. Use a long random string.`);
   }
   return {
+    base,
     define: {
       __STRICT_CONTENT__: JSON.stringify(strict),
       __PREVIEW_KEY_HASH__: JSON.stringify(previewHashFor(key)),
